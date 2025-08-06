@@ -1,10 +1,11 @@
 ## Filebeat configuration
 ## https://github.com/elastic/beats/blob/main/deploy/docker/filebeat.docker.yml
-#
 
 name: filebeat
+
 filebeat.inputs:
-  - type: log
+  - type: filestream
+    id: gocourse-log-input
     enabled: true
     paths:
       - "/var/log/filebeat/service/*.log"
@@ -12,9 +13,13 @@ filebeat.inputs:
     fields:
       environment: Development
     tags: ["gocourse"]
-    multiline.pattern: "^{"
-    multiline.negate: true
-    multiline.match: after
+    prospector.scanner.exclude_files: ['.gz$']
+    multiline:
+      type: pattern
+      pattern: "^{"
+      negate: true
+      match: after
+
 logging.level: debug
 
 filebeat.config:
@@ -37,51 +42,13 @@ processors:
       overwrite_keys: false
       add_error_key: true
 
-# filebeat.autodiscover:
-#   providers:
-#     - type: docker
-#       enabled: true
-#       templates:
-#         - condition:
-#             equals:
-#               contains.container.image: car-sale-api
-#           config:
-#             - type: docker
-#               containers.ids:
-#                 - "${data.docker.container.id}"
-#               paths:
-#                 - /var/lib/docker/containers/${data.docker.container.id}/app/logs/*.json
-#               fields:
-#                 environment: Docker
-#               tags: ["gocourse"]
-#               multiline.pattern: "^{"
-#               multiline.negate: true
-#               multiline.match: after
-
 filebeat.shutdown_timeout: 5s
-
-# filebeat.autodiscover:
-#   providers:
-#     # The Docker autodiscover provider automatically retrieves logs from Docker
-#     # containers as they start and stop.
-#     - type: docker
-#       hints.enabled: true
-
-# monitoring:
-#   enabled: true
-#   elasticsearch:
-#     username: beats_system
-#     password: ${BEATS_SYSTEM_PASSWORD}
 
 output.elasticsearch:
   hosts: ["http://elasticsearch:9200"]
   username: filebeat_internal
   password: ${FILEBEAT_INTERNAL_PASSWORD}
   index: "logs-service-%{+yyyy.MM.dd}"
-
-## HTTP endpoint for health checking
-## https://www.elastic.co/guide/en/beats/filebeat/current/http-endpoint.html
-#
 
 fields_under_root: true
 fields:

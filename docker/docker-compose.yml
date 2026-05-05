@@ -2,19 +2,25 @@ services:
   ####################### SETUP #######################
   setup:
     build:
-      context: elk/setup/
+      context: ./elk/setup/
       args:
         ELASTIC_VERSION: ${ELASTIC_VERSION}
     init: true
     volumes:
-      - ./elk/setup/entrypoint.sh:/entrypoint.sh:ro,Z
-      - ./elk/setup/helpers.sh:/helpers.sh:ro,Z
-      - ./elk/setup/roles:/roles:ro,Z
-      - setup:/state:Z
+    - ./elk/setup/entrypoint.sh:/entrypoint.sh:ro,Z
+    - ./elk/setup/helpers.sh:/helpers.sh:ro,Z
+    - ./elk/setup/lib.sh:/lib.sh:ro,Z
+    - ./elk/setup/roles:/roles:ro,Z
+    - setup:/state:Z
     environment:
       ELASTIC_PASSWORD: ${ELASTIC_PASSWORD:-}
+      LOGSTASH_INTERNAL_PASSWORD: ${LOGSTASH_INTERNAL_PASSWORD:-}
       KIBANA_SYSTEM_PASSWORD: ${KIBANA_SYSTEM_PASSWORD:-}
+      METRICBEAT_INTERNAL_PASSWORD: ${METRICBEAT_INTERNAL_PASSWORD:-}
       FILEBEAT_INTERNAL_PASSWORD: ${FILEBEAT_INTERNAL_PASSWORD:-}
+      HEARTBEAT_INTERNAL_PASSWORD: ${HEARTBEAT_INTERNAL_PASSWORD:-}
+      MONITORING_INTERNAL_PASSWORD: ${MONITORING_INTERNAL_PASSWORD:-}
+      BEATS_SYSTEM_PASSWORD: ${BEATS_SYSTEM_PASSWORD:-}
     networks:
       - webapi_network
     depends_on:
@@ -23,7 +29,7 @@ services:
   ####################### ELK #######################
   elasticsearch:
     build:
-      context: elk/elasticsearch/
+      context: ./elk/elasticsearch/
       args:
         ELASTIC_VERSION: ${ELASTIC_VERSION}
     container_name: elasticsearch
@@ -41,10 +47,20 @@ services:
     networks:
       - webapi_network
     restart: unless-stopped
-
+  kibana-genkeys:
+    profiles:
+      - setup
+    build:
+      context: kibana/
+      args:
+        ELASTIC_VERSION: ${ELASTIC_VERSION}
+    command:
+      - bin/kibana-encryption-keys
+      - generate
+    network_mode: none
   kibana:
     build:
-      context: elk/kibana/
+      context: ./elk/kibana/
       args:
         ELASTIC_VERSION: ${ELASTIC_VERSION}
     volumes:
@@ -65,25 +81,25 @@ services:
       context: elk/filebeat/
       args:
         ELASTIC_VERSION: ${ELASTIC_VERSION}
+    
     user: root
+    environment:
+      - FILEBEAT_INTERNAL_PASSWORD=${FILEBEAT_INTERNAL_PASSWORD}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
     command:
+      - filebeat
       - -e
       - --strict.perms=false
     volumes:
       - ./elk/filebeat/config/filebeat.yml:/usr/share/filebeat/filebeat.yml
       - ../logs/:/var/log/filebeat/service:ro
-      #- ../prod/logs:/var/log/filebeat/service:ro
       - logs:/var/log/filebeat
       - logs:/app:ro
- 
-    environment:
-      FILEBEAT_INTERNAL_PASSWORD: ${FILEBEAT_INTERNAL_PASSWORD:-}
-      BEATS_SYSTEM_PASSWORD: ${FILEBEAT_INTERNAL_PASSWORD:-}
     networks:
       - webapi_network
     depends_on:
       - elasticsearch
-
+      
   logstash:
      build:
       context: ./elk/logstash/

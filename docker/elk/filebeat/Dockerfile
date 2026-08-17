@@ -1,4 +1,4 @@
 ARG ELASTIC_VERSION
 
-FROM docker.elastic.co/beats/filebeat:${ELASTIC_VERSION:-9.3.4}
+FROM docker.elastic.co/beats/filebeat:${ELASTIC_VERSION:-9.5.1}
 
